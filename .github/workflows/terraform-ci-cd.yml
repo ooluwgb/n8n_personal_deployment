@@ -71,6 +71,67 @@ jobs:
           chmod 600 "$GITHUB_WORKSPACE/.nebius/private.pem"
           chmod 600 "$GITHUB_WORKSPACE/.ssh/bastion.pub"
 
+      - name: Prepare GitHub Runner Inputs
+        run: |
+          if [ ! -f terraform.tfvars ]; then
+            echo "Missing terraform.tfvars in $PWD" >&2
+            exit 1
+          fi
+
+          RUNNER_ENABLED="$(
+            awk -F= '
+              /^[[:space:]]*enable_github_runner[[:space:]]*=/ {
+                val = $2
+                sub(/#.*/, "", val)
+                gsub(/[[:space:]\"]/, "", val)
+                print tolower(val)
+                exit
+              }
+            ' terraform.tfvars 2>/dev/null || true
+          )"
+
+          # Match Terraform default behavior when key is omitted.
+          if [ -z "$RUNNER_ENABLED" ]; then
+            RUNNER_ENABLED="true"
+          fi
+
+          if [ "$RUNNER_ENABLED" != "true" ] && [ "$RUNNER_ENABLED" != "false" ]; then
+            echo "Invalid enable_github_runner value in terraform.tfvars: $RUNNER_ENABLED" >&2
+            exit 1
+          fi
+
+          if [ "$RUNNER_ENABLED" != "true" ]; then
+            echo "enable_github_runner is not true in terraform.tfvars; skipping runner token preparation."
+            exit 0
+          fi
+
+          RUNNER_URL="${{ vars.GITHUB_RUNNER_URL }}"
+          if [ -z "$RUNNER_URL" ]; then
+            RUNNER_URL="https://github.com/${GITHUB_REPOSITORY}"
+          fi
+          echo "TF_VAR_github_runner_url=$RUNNER_URL" >> "$GITHUB_ENV"
+
+          if [ -z "${{ secrets.GH_RUNNER_ADMIN_TOKEN }}" ]; then
+            echo "Missing required secret: GH_RUNNER_ADMIN_TOKEN" >&2
+            exit 1
+          fi
+
+          RUNNER_REG_TOKEN="$(
+            curl -fsSL -X POST \
+              -H "Authorization: Bearer ${{ secrets.GH_RUNNER_ADMIN_TOKEN }}" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runners/registration-token" \
+              | jq -r '.token'
+          )"
+
+          if [ -z "$RUNNER_REG_TOKEN" ] || [ "$RUNNER_REG_TOKEN" = "null" ]; then
+            echo "Failed to fetch GitHub runner registration token" >&2
+            exit 1
+          fi
+
+          echo "TF_VAR_github_runner_registration_token=$RUNNER_REG_TOKEN" >> "$GITHUB_ENV"
+
       - name: Terraform Init
         run: terraform init -input=false
 
@@ -122,6 +183,67 @@ jobs:
           printf '%s\n' "${{ vars.BASTION_SSH_PUBLIC_KEY }}" > "$GITHUB_WORKSPACE/.ssh/bastion.pub"
           chmod 600 "$GITHUB_WORKSPACE/.nebius/private.pem"
           chmod 600 "$GITHUB_WORKSPACE/.ssh/bastion.pub"
+
+      - name: Prepare GitHub Runner Inputs
+        run: |
+          if [ ! -f terraform.tfvars ]; then
+            echo "Missing terraform.tfvars in $PWD" >&2
+            exit 1
+          fi
+
+          RUNNER_ENABLED="$(
+            awk -F= '
+              /^[[:space:]]*enable_github_runner[[:space:]]*=/ {
+                val = $2
+                sub(/#.*/, "", val)
+                gsub(/[[:space:]\"]/, "", val)
+                print tolower(val)
+                exit
+              }
+            ' terraform.tfvars 2>/dev/null || true
+          )"
+
+          # Match Terraform default behavior when key is omitted.
+          if [ -z "$RUNNER_ENABLED" ]; then
+            RUNNER_ENABLED="true"
+          fi
+
+          if [ "$RUNNER_ENABLED" != "true" ] && [ "$RUNNER_ENABLED" != "false" ]; then
+            echo "Invalid enable_github_runner value in terraform.tfvars: $RUNNER_ENABLED" >&2
+            exit 1
+          fi
+
+          if [ "$RUNNER_ENABLED" != "true" ]; then
+            echo "enable_github_runner is not true in terraform.tfvars; skipping runner token preparation."
+            exit 0
+          fi
+
+          RUNNER_URL="${{ vars.GITHUB_RUNNER_URL }}"
+          if [ -z "$RUNNER_URL" ]; then
+            RUNNER_URL="https://github.com/${GITHUB_REPOSITORY}"
+          fi
+          echo "TF_VAR_github_runner_url=$RUNNER_URL" >> "$GITHUB_ENV"
+
+          if [ -z "${{ secrets.GH_RUNNER_ADMIN_TOKEN }}" ]; then
+            echo "Missing required secret: GH_RUNNER_ADMIN_TOKEN" >&2
+            exit 1
+          fi
+
+          RUNNER_REG_TOKEN="$(
+            curl -fsSL -X POST \
+              -H "Authorization: Bearer ${{ secrets.GH_RUNNER_ADMIN_TOKEN }}" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runners/registration-token" \
+              | jq -r '.token'
+          )"
+
+          if [ -z "$RUNNER_REG_TOKEN" ] || [ "$RUNNER_REG_TOKEN" = "null" ]; then
+            echo "Failed to fetch GitHub runner registration token" >&2
+            exit 1
+          fi
+
+          echo "TF_VAR_github_runner_registration_token=$RUNNER_REG_TOKEN" >> "$GITHUB_ENV"
 
       - name: Download Terraform Plan
         uses: actions/download-artifact@v4

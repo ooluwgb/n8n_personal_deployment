@@ -1,0 +1,86 @@
+users:
+  - name: ${runner_user}
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+%{ if ssh_public_key != null ~}
+    ssh_authorized_keys:
+      - ${ssh_public_key}
+%{ endif ~}
+
+package_update: true
+package_upgrade: true
+packages:
+  - curl
+  - jq
+  - git
+  - ca-certificates
+  - tar
+  - unzip
+
+write_files:
+  - path: /usr/local/bin/bootstrap-github-runner.sh
+    owner: root:root
+    permissions: "0750"
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+
+      RUNNER_USER="${runner_user}"
+      RUNNER_HOME="/opt/actions-runner"
+      RUNNER_VERSION="${runner_version}"
+      RUNNER_TGZ="actions-runner-linux-x64-${runner_version}.tar.gz"
+      RUNNER_DOWNLOAD_URL="https://github.com/actions/runner/releases/download/v${runner_version}/$${RUNNER_TGZ}"
+
+      if [[ -z "${github_runner_registration_token}" ]]; then
+        echo "github_runner_registration_token is required" >&2
+        exit 1
+      fi
+
+      id -u "$${RUNNER_USER}" >/dev/null 2>&1 || useradd --create-home --shell /bin/bash "$${RUNNER_USER}"
+      mkdir -p "$${RUNNER_HOME}"
+      cd "$${RUNNER_HOME}"
+
+      curl -fsSL -o "$${RUNNER_TGZ}" "$${RUNNER_DOWNLOAD_URL}"
+%{ if runner_download_sha256 != null && runner_download_sha256 != "" ~}
+      echo "${runner_download_sha256}  $${RUNNER_TGZ}" | sha256sum -c -
+%{ endif ~}
+      tar xzf "$${RUNNER_TGZ}"
+      "$${RUNNER_HOME}/bin/installdependencies.sh"
+      chown -R "$${RUNNER_USER}:$${RUNNER_USER}" "$${RUNNER_HOME}"
+
+      CONFIG_ARGS=(
+        --unattended
+        --replace
+        --url "${github_runner_url}"
+        --token "${github_runner_registration_token}"
+        --name "${github_runner_name}"
+        --labels "${github_runner_labels}"
+        --work "${github_runner_work_dir}"
+      )
+%{ if github_runner_group != null && github_runner_group != "" ~}
+      CONFIG_ARGS+=(--runnergroup "${github_runner_group}")
+%{ endif ~}
+
+      sudo -u "$${RUNNER_USER}" "$${RUNNER_HOME}/config.sh" "$${CONFIG_ARGS[@]}"
+      "$${RUNNER_HOME}/svc.sh" install "$${RUNNER_USER}"
+      "$${RUNNER_HOME}/svc.sh" start
+
+%{ if install_nebius_cli ~}
+      sudo -u "$${RUNNER_USER}" /bin/bash -lc "curl -sSL https://storage.eu-north1.nebius.cloud/cli/install.sh | bash"
+      sudo -u "$${RUNNER_USER}" /bin/bash -lc "/home/$${RUNNER_USER}/.nebius/bin/nebius profile create --endpoint api.eu.nebius.cloud --token-file /mnt/cloud-metadata/token --profile default --parent-id ${project_id} || true"
+      sudo -u "$${RUNNER_USER}" /bin/bash -lc "/home/$${RUNNER_USER}/.nebius/bin/nebius mk8s cluster get-credentials --id ${cluster_id} --internal --force || true"
+%{ endif ~}
+%{ if install_kubectl ~}
+      KUBECTL_VERSION="$$(curl -L -s https://dl.k8s.io/release/stable.txt)"
+      curl -fsSL -o /usr/local/bin/kubectl "https://dl.k8s.io/release/$${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+      chmod +x /usr/local/bin/kubectl
+%{ endif ~}
+%{ if install_helm ~}
+      HELM_VERSION="${helm_version}"
+      curl -fsSL "https://get.helm.sh/helm-$${HELM_VERSION}-linux-amd64.tar.gz" -o /tmp/helm.tgz
+      tar -xzf /tmp/helm.tgz -C /tmp
+      install -m 0755 /tmp/linux-amd64/helm /usr/local/bin/helm
+%{ endif ~}
+
+runcmd:
+  - /usr/local/bin/bootstrap-github-runner.sh > /var/log/bootstrap-github-runner.log 2>&1

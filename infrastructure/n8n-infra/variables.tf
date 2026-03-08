@@ -166,3 +166,225 @@ variable "bastion_ssh_public_key" {
   })
   default = {}
 }
+
+###################################
+# GitHub Self-Hosted Runner
+###################################
+
+variable "enable_github_runner" {
+  description = "When true, provisions a persistent GitHub self-hosted runner VM in Nebius."
+  type        = bool
+  default     = true
+}
+
+variable "github_runner_url" {
+  description = "GitHub repository or organization URL (for example, https://github.com/ooluwgb/n8n_personal_deployment)."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = !var.enable_github_runner || (var.github_runner_url != null && trimspace(var.github_runner_url) != "")
+    error_message = "Set github_runner_url when enable_github_runner=true."
+  }
+}
+
+variable "github_runner_registration_token" {
+  description = "Short-lived GitHub runner registration token from Actions -> Runners page."
+  type        = string
+  default     = null
+  sensitive   = true
+
+  validation {
+    condition     = !var.enable_github_runner || (var.github_runner_registration_token != null && trimspace(var.github_runner_registration_token) != "")
+    error_message = "Set github_runner_registration_token when enable_github_runner=true."
+  }
+}
+
+variable "github_runner_subnet_id" {
+  description = "Optional override subnet ID for runner VM. Null defaults to subnet_id."
+  type        = string
+  default     = null
+}
+
+variable "github_runner_instance_name" {
+  description = "Runner VM instance name."
+  type        = string
+  default     = "github-runner"
+}
+
+variable "github_runner_hostname" {
+  description = "Optional custom hostname for runner VM."
+  type        = string
+  default     = null
+}
+
+variable "github_runner_platform" {
+  description = "Compute platform for runner VM."
+  type        = string
+  default     = "cpu-d3"
+}
+
+variable "github_runner_preset" {
+  description = "Compute preset for runner VM."
+  type        = string
+  default     = "4vcpu-16gb"
+}
+
+variable "github_runner_disk_name" {
+  description = "Boot disk name for runner VM."
+  type        = string
+  default     = "github-runner-boot-disk"
+}
+
+variable "github_runner_disk_type" {
+  description = "Boot disk type for runner VM."
+  type        = string
+  default     = "NETWORK_SSD"
+}
+
+variable "github_runner_disk_size_gibibytes" {
+  description = "Boot disk size in GiB for runner VM."
+  type        = number
+  default     = 64
+}
+
+variable "github_runner_block_size_bytes" {
+  description = "Boot disk block size in bytes."
+  type        = number
+  default     = 4096
+}
+
+variable "github_runner_image_family" {
+  description = "Image family used for runner VM boot disk."
+  type        = string
+  default     = "ubuntu24.04-driverless"
+}
+
+variable "github_runner_image_family_parent_id" {
+  description = "Optional parent ID for custom runner image family."
+  type        = string
+  default     = null
+}
+
+variable "github_runner_enable_public_ip" {
+  description = "When true, attaches public IP to runner VM NIC."
+  type        = bool
+  default     = false
+}
+
+variable "github_runner_security_group_ids" {
+  description = "Optional security groups for runner VM NIC."
+  type        = list(string)
+  default     = []
+}
+
+variable "github_runner_ssh_public_key" {
+  description = "Optional SSH key for break-glass access to runner VM."
+  type = object({
+    key  = optional(string)
+    path = optional(string, "~/.ssh/id_rsa.pub")
+  })
+  default = {}
+}
+
+variable "github_runner_service_account_name" {
+  description = "Service account name for runner VM."
+  type        = string
+  default     = "github-runner-sa"
+}
+
+variable "github_runner_service_account_description" {
+  description = "Service account description for runner VM."
+  type        = string
+  default     = "Service account for persistent GitHub self-hosted runner VM."
+}
+
+variable "github_runner_iam_group_name" {
+  description = "IAM group to add runner service account to. Set null to skip group membership."
+  type        = string
+  default     = "editors"
+}
+
+variable "github_runner_name" {
+  description = "Runner name registered in GitHub. Empty string falls back to github_runner_instance_name."
+  type        = string
+  default     = ""
+}
+
+variable "github_runner_group" {
+  description = "Optional GitHub runner group name."
+  type        = string
+  default     = null
+}
+
+variable "github_runner_labels" {
+  description = "Runner labels used in workflow runs-on selectors."
+  type        = list(string)
+  default     = ["self-hosted", "linux", "x64", "nebius-private"]
+}
+
+variable "github_runner_work_dir" {
+  description = "GitHub runner work directory path."
+  type        = string
+  default     = "_work"
+}
+
+variable "github_runner_user" {
+  description = "Linux user account used for GitHub runner service."
+  type        = string
+  default     = "github-runner"
+}
+
+variable "github_runner_version" {
+  description = "GitHub Actions runner version to install."
+  type        = string
+  default     = "2.332.0"
+}
+
+variable "github_runner_download_sha256" {
+  description = "SHA256 checksum for selected runner archive."
+  type        = string
+  default     = "f2094522a6b9afeab07ffb586d1eb3f190b6457074282796c497ce7dce9e0f2a"
+}
+
+variable "github_runner_install_nebius_cli" {
+  description = "Install Nebius CLI and configure profile using instance metadata token."
+  type        = bool
+  default     = true
+}
+
+variable "github_runner_install_kubectl" {
+  description = "Install kubectl on runner VM."
+  type        = bool
+  default     = true
+}
+
+variable "github_runner_install_helm" {
+  description = "Install Helm on runner VM."
+  type        = bool
+  default     = true
+}
+
+variable "github_runner_helm_version" {
+  description = "Helm version installed on runner VM when github_runner_install_helm=true."
+  type        = string
+  default     = "v3.17.1"
+}
+
+variable "github_runner_recovery_policy" {
+  description = "Recovery policy for runner VM (RECOVER or FAIL)."
+  type        = string
+  default     = "RECOVER"
+}
+
+variable "github_runner_stopped" {
+  description = "Whether runner VM should be kept in stopped state."
+  type        = bool
+  default     = null
+}
+
+variable "github_runner_resource_labels" {
+  description = "Resource labels applied to runner VM, boot disk, and service account."
+  type        = map(string)
+  default     = {}
+}
