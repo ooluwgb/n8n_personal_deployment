@@ -10,7 +10,8 @@ permissions:
   contents: read
 
 env:
-  TF_WORKING_DIR: "infrastructure"
+  TF_WORKING_DIR: "infrastructure/n8n-infra"
+  CHECKOV_DIR: "infrastructure"
 
 jobs:
   security-scans:
@@ -30,7 +31,7 @@ jobs:
       - name: Checkov IaC Scan
         uses: bridgecrewio/checkov-action@v12
         with:
-          directory: ${{ env.TF_WORKING_DIR }}
+          directory: ${{ env.CHECKOV_DIR }}
           framework: terraform
           soft_fail: false
 
@@ -49,6 +50,7 @@ jobs:
       TF_VAR_nb_service_account_id: ${{ secrets.NEBIUS_SERVICE_ACCOUNT_ID }}
       TF_VAR_nb_public_key_id: ${{ secrets.NEBIUS_PUBLIC_KEY_ID }}
       TF_VAR_nb_private_key_file: ${{ github.workspace }}/.nebius/private.pem
+      TF_VAR_bastion_ssh_public_key: '{"path":"${{ github.workspace }}/.ssh/bastion.pub"}'
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -58,9 +60,16 @@ jobs:
 
       - name: Prepare Nebius Credentials
         run: |
+          if [ -z "${{ vars.BASTION_SSH_PUBLIC_KEY }}" ]; then
+            echo "Missing repository variable: BASTION_SSH_PUBLIC_KEY" >&2
+            exit 1
+          fi
           mkdir -p "$GITHUB_WORKSPACE/.nebius"
+          mkdir -p "$GITHUB_WORKSPACE/.ssh"
           printf '%s' "${{ secrets.NEBIUS_SERVICE_ACCOUNT_PRIVATE_KEY }}" > "$GITHUB_WORKSPACE/.nebius/private.pem"
+          printf '%s\n' "${{ vars.BASTION_SSH_PUBLIC_KEY }}" > "$GITHUB_WORKSPACE/.ssh/bastion.pub"
           chmod 600 "$GITHUB_WORKSPACE/.nebius/private.pem"
+          chmod 600 "$GITHUB_WORKSPACE/.ssh/bastion.pub"
 
       - name: Terraform Init
         run: terraform init -input=false
@@ -93,6 +102,7 @@ jobs:
       TF_VAR_nb_service_account_id: ${{ secrets.NEBIUS_SERVICE_ACCOUNT_ID }}
       TF_VAR_nb_public_key_id: ${{ secrets.NEBIUS_PUBLIC_KEY_ID }}
       TF_VAR_nb_private_key_file: ${{ github.workspace }}/.nebius/private.pem
+      TF_VAR_bastion_ssh_public_key: '{"path":"${{ github.workspace }}/.ssh/bastion.pub"}'
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -102,9 +112,16 @@ jobs:
 
       - name: Prepare Nebius Credentials
         run: |
+          if [ -z "${{ vars.BASTION_SSH_PUBLIC_KEY }}" ]; then
+            echo "Missing repository variable: BASTION_SSH_PUBLIC_KEY" >&2
+            exit 1
+          fi
           mkdir -p "$GITHUB_WORKSPACE/.nebius"
+          mkdir -p "$GITHUB_WORKSPACE/.ssh"
           printf '%s' "${{ secrets.NEBIUS_SERVICE_ACCOUNT_PRIVATE_KEY }}" > "$GITHUB_WORKSPACE/.nebius/private.pem"
+          printf '%s\n' "${{ vars.BASTION_SSH_PUBLIC_KEY }}" > "$GITHUB_WORKSPACE/.ssh/bastion.pub"
           chmod 600 "$GITHUB_WORKSPACE/.nebius/private.pem"
+          chmod 600 "$GITHUB_WORKSPACE/.ssh/bastion.pub"
 
       - name: Download Terraform Plan
         uses: actions/download-artifact@v4
