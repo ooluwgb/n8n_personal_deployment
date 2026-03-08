@@ -1,0 +1,82 @@
+# ─── Node Groups Configuration ──────────────────────────────────────
+#
+# Each node group only needs a "name" and "node_group_type" to work.
+# Everything else has defaults — override only what you need.
+#
+# A few things to know:
+#
+#   - cluster_id, k8s_version, subnet_id, and service_account_id
+#     come from Terraform variables, not this file.
+#
+#   - "database" node groups automatically use NETWORK_SSD_IO_M3 for disk
+#     (optimised for high IOPS). "application" node groups default to
+#     NETWORK_SSD (good general-purpose performance). You can override
+#     this by setting boot_disk_type explicitly in the YAML.
+#
+#   - NETWORK_SSD_IO_M3 disk sizes must be multiples of 93 GiB
+#     (e.g. 93, 186, 279). The default for database nodes is 93 GiB.
+#
+#   - For node count, choose ONE approach (they're mutually exclusive):
+#       • fixed_node_count    → always runs exactly N nodes
+#       • autoscaling_min/max → scales between min and max (both required)
+#       • nothing set         → defaults to autoscaling 2–3
+#
+# ─── Optional overrides (per node group) ────────────────────────────
+#
+# Compute:
+#   platform .............. cpu-d3, cpu-e1, gpu-h100-sxm, etc.    (default: cpu-d3)
+#   preset ................ 2vcpu-8gb, 4vcpu-16gb, 8vcpu-32gb     (default: 4vcpu-16gb)
+#   preemptible ........... use spot/preemptible nodes             (default: false)
+#
+# Disk:
+#   boot_disk_size_gb ..... disk size in GiB                       (default: 96)
+#   boot_disk_type ........ NETWORK_SSD, NETWORK_SSD_IO_M3, etc.  (default: auto — see above)
+#
+# Networking:
+#   subnet_id ............. override the default subnet            (default: from root module)
+#   enable_public_ip ...... give nodes a public IP                 (default: false)
+#
+# Kubernetes:
+#   node_labels ........... labels applied to K8s nodes            (default: {})
+#   node_taints ........... list of {key, value, effect}           (default: [])
+#   resource_labels ....... labels on the Nebius resource itself   (default: {})
+#
+# Storage:
+#   filesystem_id ......... attach a shared Compute Filesystem     (default: none)
+#   filesystem_mount_tag .. mount tag inside the node              (default: "data")
+#
+# GPU:
+#   gpu_cluster_id ........ GPU cluster ID                         (default: none)
+#   gpu_drivers_preset .... cuda12, cuda12.4, cuda12.8             (default: none)
+#
+# OS & Init:
+#   os .................... ubuntu22.04 or ubuntu24.04             (default: ubuntu24.04)
+#   cloud_init_user_data .. cloud-init script (SSH keys, etc.)     (default: none)
+#   service_account_id .... override SA for this group only        (default: from root module)
+#
+# Rolling Updates:
+#   drain_timeout ......... e.g. 5m, 10m, 1h                      (default: none)
+#   max_surge_count ....... extra nodes spun up during update      (default: none)
+#   max_unavailable_count . nodes allowed offline during update    (default: none)
+#
+# Health:
+#   enable_auto_repair .... auto-replace unhealthy nodes           (default: true)
+#   auto_repair_timeout ... how long to wait before replacing      (default: 5m)
+#
+# ────────────────────────────────────────────────────────────────────
+
+# ── Node Groups ─────────────────────────────────────────────────────
+node_groups:
+
+  app-nodes:
+    name:            "app-nodes"
+    node_group_type: "application"
+    autoscaling_min: 1
+    autoscaling_max: 2
+
+  db-nodes:
+    name:            "db-nodes"
+    node_group_type: "database"
+    autoscaling_min: 2
+    autoscaling_max: 3
+  
