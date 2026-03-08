@@ -143,6 +143,11 @@ variable "bastion_image_family" {
   default     = "ubuntu24.04-driverless"
 }
 
+variable "bastion_auth_key_expires_at" {
+  description = "Absolute expiration timestamp for bastion service-account auth key in RFC3339 format (rotate quarterly by setting next quarter end)."
+  type        = string
+}
+
 variable "bastion_ssh_user_name" {
   description = "SSH username for the bastion host."
   type        = string

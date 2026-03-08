@@ -32,10 +32,9 @@ variable "service_account_description" {
 # Auth key configuration
 ###################################
 
-variable "key_expiry" {
-  description = "Duration until the auth public key expires (Go duration format). Default: 1 year."
+variable "auth_key_expires_at" {
+  description = "Absolute expiration timestamp for the auth public key in RFC3339 format (for example, 2026-06-30T23:59:59Z)."
   type        = string
-  default     = "8760h"
 }
 
 ###################################

@@ -27,7 +27,7 @@ module "service_account" {
   tenant_id                   = var.tenant_id
   service_account_name        = var.service_account_name
   service_account_description = var.service_account_description
-  key_expiry                  = var.key_expiry
+  auth_key_expires_at         = var.auth_key_expires_at
   iam_group_name              = var.iam_group_name
   labels                      = var.labels
 }

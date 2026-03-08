@@ -38,6 +38,7 @@ module "bastion" {
   disk_type           = var.bastion_disk_type
   disk_size_gibibytes = var.bastion_disk_size_gibibytes
   image_family        = var.bastion_image_family
+  auth_key_expires_at = var.bastion_auth_key_expires_at
   ssh_user_name  = var.bastion_ssh_user_name
   ssh_public_key = var.bastion_ssh_public_key
   labels = var.labels

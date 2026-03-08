@@ -42,7 +42,7 @@ resource "nebius_iam_v1_service_account" "this" {
 resource "nebius_iam_v1_auth_public_key" "this" {
   parent_id  = var.project_id
   name       = "${var.service_account_name}-auth-key"
-  expires_at = timeadd(timestamp(), var.key_expiry)
+  expires_at = var.auth_key_expires_at
 
   account = {
     service_account = {
