@@ -1,0 +1,119 @@
+name: Terraform CI/CD with Security Scans
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+env:
+  TF_WORKING_DIR: "infrastructure"
+
+jobs:
+  security-scans:
+    name: Security & Secret Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Secret Scanning (Gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkov IaC Scan
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: ${{ env.TF_WORKING_DIR }}
+          framework: terraform
+          soft_fail: false
+
+  plan:
+    name: Terraform Plan
+    needs: security-scans
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ env.TF_WORKING_DIR }}
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.NEBIUS_S3_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.NEBIUS_S3_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: eu-north1
+      TF_VAR_nb_service_account_id: ${{ secrets.NEBIUS_SERVICE_ACCOUNT_ID }}
+      TF_VAR_nb_public_key_id: ${{ secrets.NEBIUS_PUBLIC_KEY_ID }}
+      TF_VAR_nb_private_key_file: ${{ github.workspace }}/.nebius/private.pem
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Prepare Nebius Credentials
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/.nebius"
+          printf '%s' "${{ secrets.NEBIUS_SERVICE_ACCOUNT_PRIVATE_KEY }}" > "$GITHUB_WORKSPACE/.nebius/private.pem"
+          chmod 600 "$GITHUB_WORKSPACE/.nebius/private.pem"
+
+      - name: Terraform Init
+        run: terraform init -input=false
+
+      - name: Terraform Plan
+        run: terraform plan -input=false -out=tfplan
+
+      - name: Upload Terraform Plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan
+          path: ${{ env.TF_WORKING_DIR }}/tfplan
+          retention-days: 1
+
+  apply:
+    name: Terraform Apply
+    needs: plan
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    concurrency:
+      group: terraform-apply-${{ github.repository }}
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ env.TF_WORKING_DIR }}
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.NEBIUS_S3_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.NEBIUS_S3_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: eu-north1
+      TF_VAR_nb_service_account_id: ${{ secrets.NEBIUS_SERVICE_ACCOUNT_ID }}
+      TF_VAR_nb_public_key_id: ${{ secrets.NEBIUS_PUBLIC_KEY_ID }}
+      TF_VAR_nb_private_key_file: ${{ github.workspace }}/.nebius/private.pem
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Prepare Nebius Credentials
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/.nebius"
+          printf '%s' "${{ secrets.NEBIUS_SERVICE_ACCOUNT_PRIVATE_KEY }}" > "$GITHUB_WORKSPACE/.nebius/private.pem"
+          chmod 600 "$GITHUB_WORKSPACE/.nebius/private.pem"
+
+      - name: Download Terraform Plan
+        uses: actions/download-artifact@v4
+        with:
+          name: terraform-plan
+          path: ${{ env.TF_WORKING_DIR }}
+
+      - name: Terraform Init
+        run: terraform init -input=false
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve tfplan
