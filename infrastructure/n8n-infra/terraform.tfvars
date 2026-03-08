@@ -17,7 +17,7 @@ bastion_disk_size_gibibytes = 64
 bastion_image_family        = "ubuntu24.04-driverless"
 bastion_auth_key_expires_at = "2026-06-30T23:59:59Z"
 bastion_ssh_user_name      = "bastion"
-# bastion_ssh_public_key   = { path = "~/.ssh/id_rsa.pub" }  # default — reads from your machine
+# bastion_ssh_public_key = { path = "~/.ssh/id_rsa.pub" }  # optional for local Terraform runs
 
 ###################################
 # GitHub Self-Hosted Runner (persistent)
@@ -32,4 +32,10 @@ enable_github_runner = true
 # github_runner_labels = ["self-hosted", "linux", "x64", "nebius-private"]
 # github_runner_instance_name = "github-runner"
 # github_runner_subnet_id = "vpcsubnet-xxxxxxxxxxxxxxxx"
+# Runner SSH access is optional and does not affect GitHub Actions execution.
+# CI behavior:
+# - If repository variable RUNNER_SSH_PUBLIC_KEY is set, CI passes it as
+#   TF_VAR_github_runner_ssh_public_key and SSH access is enabled.
+# - If RUNNER_SSH_PUBLIC_KEY is not set, no key is injected and SSH access
+#   remains disabled.
 # github_runner_ssh_public_key = { path = "~/.ssh/id_rsa.pub" }
